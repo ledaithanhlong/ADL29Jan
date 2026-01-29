@@ -95,6 +95,32 @@
                         <button class="btn btn-success btn-sm btn-sort" onclick="sortByPrice('desc')">
                             Giá Giảm ↓
                         </button>
+                        <button class="btn btn-warning btn-sm btn-sort" onclick="resetData()">
+                            Reset
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pagination Section -->
+        <div class="search-sort-section">
+            <div class="row">
+                <div class="col-md-12">
+                    <label class="form-label">Số lượng hiển thị trên 1 trang:</label>
+                    <div>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="changePageSize(5)">
+                            5 sản phẩm
+                        </button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="changePageSize(10)">
+                            10 sản phẩm
+                        </button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="changePageSize(15)">
+                            15 sản phẩm
+                        </button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="changePageSize(-1)">
+                            Tất cả
+                        </button>
                     </div>
                 </div>
             </div>

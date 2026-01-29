@@ -5,6 +5,10 @@ const dataUrl = './db.json';
 let allProducts = [];
 let filteredProducts = [];
 
+// Biến phân trang
+let currentPageSize = -1; // -1 nghĩa là hiển thị tất cả
+let currentPage = 1;
+
 // Lấy element app để render dữ liệu
 const appElement = document.getElementById('app');
 
@@ -37,7 +41,7 @@ function fetchData() {
         });
 }
 
-// Hàm render bảng sản phẩm
+// Hàm render bảng sản phẩm với phân trang
 function renderProductsTable(products) {
     // Xóa nội dung cũ
     appElement.innerHTML = '';
@@ -46,6 +50,17 @@ function renderProductsTable(products) {
     if (!products || products.length === 0) {
         appElement.innerHTML = '<div class="error">Không có dữ liệu để hiển thị</div>';
         return;
+    }
+
+    // Tính toán phân trang
+    let displayProducts = products;
+    let totalPages = 1;
+
+    if (currentPageSize > 0) {
+        totalPages = Math.ceil(products.length / currentPageSize);
+        const startIndex = (currentPage - 1) * currentPageSize;
+        const endIndex = startIndex + currentPageSize;
+        displayProducts = products.slice(startIndex, endIndex);
     }
 
     // Tạo bảng Bootstrap
@@ -63,7 +78,7 @@ function renderProductsTable(products) {
                     </tr>
                 </thead>
                 <tbody>
-                    ${products.map(function (product) {
+                    ${displayProducts.map(function (product) {
         return `
                             <tr>
                                 <td>${product.id}</td>
@@ -84,7 +99,25 @@ function renderProductsTable(products) {
             </table>
         </div>
         <div class="text-center mt-3">
-            <p class="text-muted">Tổng số sản phẩm: <strong>${products.length}</strong></p>
+            <p class="text-muted">
+                Hiển thị ${displayProducts.length} / ${products.length} sản phẩm
+                ${currentPageSize > 0 ? ` (Trang ${currentPage}/${totalPages})` : ''}
+            </p>
+            ${currentPageSize > 0 && totalPages > 1 ? `
+                <div class="btn-group" role="group">
+                    <button class="btn btn-sm btn-outline-primary" onclick="changePage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>
+                        ← Trước
+                    </button>
+                    ${Array.from({ length: totalPages }, (_, i) => i + 1).map(page => `
+                        <button class="btn btn-sm ${page === currentPage ? 'btn-primary' : 'btn-outline-primary'}" onclick="changePage(${page})">
+                            ${page}
+                        </button>
+                    `).join('')}
+                    <button class="btn btn-sm btn-outline-primary" onclick="changePage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>
+                        Sau →
+                    </button>
+                </div>
+            ` : ''}
         </div>
     `;
 
@@ -150,6 +183,41 @@ function sortByPrice(order) {
 
     // Render lại bảng
     renderProductsTable(filteredProducts);
+}
+
+// Hàm reset về trạng thái ban đầu
+function resetData() {
+    // Xóa nội dung ô tìm kiếm
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        searchInput.value = '';
+    }
+
+    // Reset về dữ liệu gốc
+    filteredProducts = [...allProducts];
+
+    // Reset trang về 1
+    currentPage = 1;
+
+    // Render lại bảng
+    renderProductsTable(filteredProducts);
+}
+
+// Hàm thay đổi số lượng hiển thị trên 1 trang
+function changePageSize(size) {
+    currentPageSize = size;
+    currentPage = 1; // Reset về trang 1
+    renderProductsTable(filteredProducts);
+}
+
+// Hàm chuyển trang
+function changePage(page) {
+    const totalPages = Math.ceil(filteredProducts.length / currentPageSize);
+
+    if (page >= 1 && page <= totalPages) {
+        currentPage = page;
+        renderProductsTable(filteredProducts);
+    }
 }
 
 // Gọi hàm fetch khi trang load xong
