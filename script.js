@@ -2,23 +2,30 @@
 const dataUrl = './db.json';
 
 // Biến lưu trữ dữ liệu gốc
-let allProducts = [];
-let filteredProducts = [];
+let allData = { posts: [], comments: [], profile: {} };
+let allPosts = [];
+let filteredPosts = [];
+let allComments = [];
+let showDeleted = true; // Hiển thị cả bài viết đã xóa
 
 // Biến phân trang
-let currentPageSize = 5; // Mặc định hiển thị 5 sản phẩm/trang
+let currentPageSize = 5;
 let currentPage = 1;
 
 // Biến cho modal
-let editingProductIndex = -1;
-let productModal;
+let editingPostIndex = -1;
+let editingCommentIndex = -1;
+let postModal;
+let commentModal;
+let currentPostId = null; // ID bài viết hiện tại để xem comments
 
 // Lấy element app để render dữ liệu
 const appElement = document.getElementById('app');
 
 // Khởi tạo modal khi trang load
 document.addEventListener('DOMContentLoaded', function () {
-    productModal = new bootstrap.Modal(document.getElementById('productModal'));
+    postModal = new bootstrap.Modal(document.getElementById('postModal'));
+    commentModal = new bootstrap.Modal(document.getElementById('commentModal'));
 });
 
 // Hàm fetch dữ liệu từ db.json
@@ -33,9 +40,11 @@ function fetchData() {
             return response.json();
         })
         .then(function (data) {
-            allProducts = data;
-            filteredProducts = [...data];
-            renderProductsTable(filteredProducts);
+            allData = data;
+            allPosts = data.posts || [];
+            allComments = data.comments || [];
+            filteredPosts = [...allPosts];
+            renderPostsTable(filteredPosts);
         })
         .catch(function (error) {
             appElement.innerHTML = '<div class="error">Lỗi: ' + error.message + '</div>';
@@ -43,24 +52,56 @@ function fetchData() {
         });
 }
 
-// Hàm render bảng sản phẩm với phân trang
-function renderProductsTable(products) {
+// Hàm lấy max ID và tạo ID mới
+function getNextPostId() {
+    if (allPosts.length === 0) return "1";
+
+    const maxId = Math.max(...allPosts.map(p => parseInt(p.id) || 0));
+    return String(maxId + 1);
+}
+
+function getNextCommentId() {
+    if (allComments.length === 0) return "1";
+
+    const maxId = Math.max(...allComments.map(c => parseInt(c.id) || 0));
+    return String(maxId + 1);
+}
+
+// Hàm toggle hiển thị bài viết đã xóa
+function toggleShowDeleted() {
+    showDeleted = !showDeleted;
+    const btn = document.getElementById('toggleDeletedBtn');
+    btn.textContent = showDeleted ? '👁️ Ẩn đã xóa' : '👁️ Hiện đã xóa';
+    btn.className = showDeleted ? 'btn btn-sm btn-warning' : 'btn btn-sm btn-secondary';
+
+    if (showDeleted) {
+        filteredPosts = [...allPosts];
+    } else {
+        filteredPosts = allPosts.filter(p => !p.isDeleted);
+    }
+
+    currentPage = 1;
+    renderPostsTable(filteredPosts);
+}
+
+// Hàm render bảng bài viết với phân trang
+function renderPostsTable(posts) {
     appElement.innerHTML = '';
 
-    if (!products || products.length === 0) {
+    if (!posts || posts.length === 0) {
         appElement.innerHTML = '<div class="error">Không có dữ liệu để hiển thị</div>';
         return;
     }
 
     // Tính toán phân trang
-    let displayProducts = products;
+    let displayPosts = posts;
     let totalPages = 1;
 
     if (currentPageSize > 0) {
-        totalPages = Math.ceil(products.length / currentPageSize);
+        totalPages = Math.ceil(posts.length / currentPageSize);
         const startIndex = (currentPage - 1) * currentPageSize;
         const endIndex = startIndex + currentPageSize;
-        displayProducts = products.slice(startIndex, endIndex);
+        displayPosts = posts.slice(startIndex, endIndex);
     }
 
     // Tạo bảng Bootstrap
@@ -70,36 +111,31 @@ function renderProductsTable(products) {
                 <thead>
                     <tr>
                         <th style="width: 60px;">ID</th>
-                        <th style="width: 90px;">Hình ảnh</th>
-                        <th>Tên sản phẩm</th>
-                        <th>Mô tả</th>
-                        <th style="width: 100px;">Giá</th>
-                        <th style="width: 120px;">Danh mục</th>
-                        <th style="width: 150px;">Thao tác</th>
+                        <th>Title</th>
+                        <th style="width: 100px;">Views</th>
+                        <th style="width: 200px;">Thao tác</th>
                     </tr>
                 </thead>
                 <tbody>
-                    ${displayProducts.map(function (product, index) {
-        const actualIndex = currentPageSize > 0 ?
-            (currentPage - 1) * currentPageSize + index :
-            index;
+                    ${displayPosts.map(function (post, index) {
+        const actualIndex = allPosts.findIndex(p => p.id === post.id);
+        const isDeleted = post.isDeleted || false;
+        const rowStyle = isDeleted ? 'style="text-decoration: line-through; opacity: 0.6; background-color: #ffe6e6;"' : '';
+
         return `
-                            <tr>
-                                <td>${product.id}</td>
-                                <td>
-                                    <img src="${product.images && product.images[0] ? product.images[0] : 'https://placehold.co/70x70'}" 
-                                         class="product-image" 
-                                         alt="${product.title || 'Product'}"
-                                         onerror="this.src='https://placehold.co/70x70?text=No+Image'">
-                                </td>
-                                <td><strong>${product.title || 'Không có tên'}</strong></td>
-                                <td>${product.description || 'Không có mô tả'}</td>
-                                <td><span class="badge bg-success">$${product.price || 0}</span></td>
-                                <td><span class="badge bg-primary">${product.category && product.category.name ? product.category.name : 'Uncategorized'}</span></td>
+                            <tr ${rowStyle}>
+                                <td>${post.id}</td>
+                                <td><strong>${post.title || 'Không có tên'}</strong></td>
+                                <td><span class="badge bg-success">${post.views || 0}</span></td>
                                 <td>
                                     <div class="action-buttons">
-                                        <button class="btn btn-sm btn-primary" onclick="editProduct(${actualIndex})">Sửa</button>
-                                        <button class="btn btn-sm btn-danger" onclick="deleteProduct(${actualIndex})">Xóa</button>
+                                        ${!isDeleted ? `
+                                            <button class="btn btn-sm btn-primary" onclick="editPost(${actualIndex})">Sửa</button>
+                                            <button class="btn btn-sm btn-danger" onclick="softDeletePost(${actualIndex})">Xóa</button>
+                                        ` : `
+                                            <button class="btn btn-sm btn-success" onclick="restorePost(${actualIndex})">Khôi phục</button>
+                                        `}
+                                        <button class="btn btn-sm btn-info" onclick="viewComments('${post.id}')">Comments</button>
                                     </div>
                                 </td>
                             </tr>
@@ -110,7 +146,7 @@ function renderProductsTable(products) {
         </div>
         <div class="text-center mt-3">
             <p class="text-muted">
-                Hiển thị ${displayProducts.length} / ${products.length} sản phẩm
+                Hiển thị ${displayPosts.length} / ${posts.length} bài viết
                 ${currentPageSize > 0 ? ` (Trang ${currentPage}/${totalPages})` : ''}
             </p>
             ${currentPageSize > 0 && totalPages > 1 ? `
@@ -118,7 +154,12 @@ function renderProductsTable(products) {
                     <button class="btn btn-sm btn-outline-secondary" onclick="changePage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>
                         ← Trước
                     </button>
-                    ${Array.from({ length: totalPages }, (_, i) => i + 1).map(page => `
+                    ${Array.from({ length: Math.min(totalPages, 10) }, (_, i) => {
+        if (totalPages <= 10) return i + 1;
+        if (currentPage <= 5) return i + 1;
+        if (currentPage >= totalPages - 4) return totalPages - 9 + i;
+        return currentPage - 5 + i;
+    }).map(page => `
                         <button class="btn btn-sm ${page === currentPage ? 'btn-primary' : 'btn-outline-secondary'}" onclick="changePage(${page})">
                             ${page}
                         </button>
@@ -139,22 +180,24 @@ function handleSearch() {
     const searchInput = document.getElementById('searchInput');
     const searchTerm = searchInput.value.toLowerCase().trim();
 
+    let basePosts = showDeleted ? allPosts : allPosts.filter(p => !p.isDeleted);
+
     if (searchTerm === '') {
-        filteredProducts = [...allProducts];
+        filteredPosts = [...basePosts];
     } else {
-        filteredProducts = allProducts.filter(function (product) {
-            const productName = product.title ? product.title.toLowerCase() : '';
-            return productName.includes(searchTerm);
+        filteredPosts = basePosts.filter(function (post) {
+            const postTitle = post.title ? post.title.toLowerCase() : '';
+            return postTitle.includes(searchTerm);
         });
     }
 
     currentPage = 1;
-    renderProductsTable(filteredProducts);
+    renderPostsTable(filteredPosts);
 }
 
 // Hàm sắp xếp theo tên
 function sortByName(order) {
-    filteredProducts.sort(function (a, b) {
+    filteredPosts.sort(function (a, b) {
         const nameA = (a.title || '').toLowerCase();
         const nameB = (b.title || '').toLowerCase();
 
@@ -169,23 +212,23 @@ function sortByName(order) {
         }
     });
 
-    renderProductsTable(filteredProducts);
+    renderPostsTable(filteredPosts);
 }
 
-// Hàm sắp xếp theo giá
+// Hàm sắp xếp theo views
 function sortByPrice(order) {
-    filteredProducts.sort(function (a, b) {
-        const priceA = a.price || 0;
-        const priceB = b.price || 0;
+    filteredPosts.sort(function (a, b) {
+        const viewsA = parseInt(a.views) || 0;
+        const viewsB = parseInt(b.views) || 0;
 
         if (order === 'asc') {
-            return priceA - priceB;
+            return viewsA - viewsB;
         } else {
-            return priceB - priceA;
+            return viewsB - viewsA;
         }
     });
 
-    renderProductsTable(filteredProducts);
+    renderPostsTable(filteredPosts);
 }
 
 // Hàm reset về trạng thái ban đầu
@@ -195,117 +238,231 @@ function resetData() {
         searchInput.value = '';
     }
 
-    filteredProducts = [...allProducts];
+    filteredPosts = showDeleted ? [...allPosts] : allPosts.filter(p => !p.isDeleted);
     currentPage = 1;
-    renderProductsTable(filteredProducts);
+    renderPostsTable(filteredPosts);
 }
 
 // Hàm thay đổi số lượng hiển thị trên 1 trang
 function changePageSize(size) {
     currentPageSize = size;
     currentPage = 1;
-    renderProductsTable(filteredProducts);
+    renderPostsTable(filteredPosts);
 }
 
 // Hàm chuyển trang
 function changePage(page) {
-    const totalPages = Math.ceil(filteredProducts.length / currentPageSize);
+    const totalPages = Math.ceil(filteredPosts.length / currentPageSize);
 
     if (page >= 1 && page <= totalPages) {
         currentPage = page;
-        renderProductsTable(filteredProducts);
+        renderPostsTable(filteredPosts);
     }
 }
 
-// === CRUD FUNCTIONS ===
+// === POST CRUD FUNCTIONS ===
 
-// Mở modal thêm sản phẩm
+// Mở modal thêm bài viết
 function openAddModal() {
-    editingProductIndex = -1;
-    document.getElementById('modalTitle').textContent = 'Thêm sản phẩm';
-    document.getElementById('productForm').reset();
-    document.getElementById('productId').value = '';
-    productModal.show();
+    editingPostIndex = -1;
+    document.getElementById('modalTitle').textContent = 'Thêm bài viết';
+    document.getElementById('postForm').reset();
+    document.getElementById('postId').value = ''; // Để trống, sẽ tự động tạo
+    postModal.show();
 }
 
-// Mở modal sửa sản phẩm
-function editProduct(index) {
-    editingProductIndex = index;
-    const product = filteredProducts[index];
+// Mở modal sửa bài viết
+function editPost(index) {
+    editingPostIndex = index;
+    const post = allPosts[index];
 
-    document.getElementById('modalTitle').textContent = 'Sửa sản phẩm';
-    document.getElementById('productId').value = product.id;
-    document.getElementById('productTitle').value = product.title || '';
-    document.getElementById('productDescription').value = product.description || '';
-    document.getElementById('productPrice').value = product.price || '';
-    document.getElementById('productImage').value = product.images && product.images[0] ? product.images[0] : '';
-    document.getElementById('productCategory').value = product.category && product.category.name ? product.category.name : '';
+    document.getElementById('modalTitle').textContent = 'Sửa bài viết';
+    document.getElementById('postId').value = post.id;
+    document.getElementById('postTitle').value = post.title || '';
+    document.getElementById('postViews').value = post.views || '';
 
-    productModal.show();
+    postModal.show();
 }
 
-// Lưu sản phẩm (thêm hoặc sửa)
-function saveProduct() {
-    const title = document.getElementById('productTitle').value.trim();
-    const description = document.getElementById('productDescription').value.trim();
-    const price = parseFloat(document.getElementById('productPrice').value);
-    const imageUrl = document.getElementById('productImage').value.trim();
-    const categoryName = document.getElementById('productCategory').value.trim();
+// Lưu bài viết (thêm hoặc sửa)
+function savePost() {
+    const title = document.getElementById('postTitle').value.trim();
+    const views = document.getElementById('postViews').value.trim();
 
-    if (!title || !price) {
-        alert('Vui lòng nhập tên sản phẩm và giá!');
+    if (!title) {
+        alert('Vui lòng nhập tiêu đề bài viết!');
         return;
     }
 
-    const productData = {
-        id: editingProductIndex === -1 ? Date.now() : filteredProducts[editingProductIndex].id,
+    const postData = {
+        id: editingPostIndex === -1 ? getNextPostId() : allPosts[editingPostIndex].id,
         title: title,
-        description: description,
-        price: price,
-        images: [imageUrl || 'https://placehold.co/600x400'],
-        category: {
-            id: 1,
-            name: categoryName || 'Uncategorized'
-        }
+        views: views || '0',
+        isDeleted: false
     };
 
-    if (editingProductIndex === -1) {
+    if (editingPostIndex === -1) {
         // Thêm mới
-        allProducts.push(productData);
-        filteredProducts.push(productData);
+        allPosts.push(postData);
     } else {
         // Sửa
-        const productId = filteredProducts[editingProductIndex].id;
-        const allProductIndex = allProducts.findIndex(p => p.id === productId);
-
-        if (allProductIndex !== -1) {
-            allProducts[allProductIndex] = productData;
-        }
-        filteredProducts[editingProductIndex] = productData;
+        allPosts[editingPostIndex] = postData;
     }
 
-    productModal.hide();
-    renderProductsTable(filteredProducts);
+    // Cập nhật filteredPosts
+    filteredPosts = showDeleted ? [...allPosts] : allPosts.filter(p => !p.isDeleted);
+
+    postModal.hide();
+    renderPostsTable(filteredPosts);
 }
 
-// Xóa sản phẩm
-function deleteProduct(index) {
-    if (!confirm('Bạn có chắc chắn muốn xóa sản phẩm này?')) {
+// Xóa mềm bài viết
+function softDeletePost(index) {
+    if (!confirm('Bạn có chắc chắn muốn xóa bài viết này?')) {
         return;
     }
 
-    const productId = filteredProducts[index].id;
+    allPosts[index].isDeleted = true;
 
-    // Xóa khỏi allProducts
-    const allProductIndex = allProducts.findIndex(p => p.id === productId);
-    if (allProductIndex !== -1) {
-        allProducts.splice(allProductIndex, 1);
+    // Cập nhật filteredPosts
+    if (!showDeleted) {
+        filteredPosts = allPosts.filter(p => !p.isDeleted);
+    } else {
+        filteredPosts = [...allPosts];
     }
 
-    // Xóa khỏi filteredProducts
-    filteredProducts.splice(index, 1);
+    renderPostsTable(filteredPosts);
+}
 
-    renderProductsTable(filteredProducts);
+// Khôi phục bài viết
+function restorePost(index) {
+    if (!confirm('Bạn có muốn khôi phục bài viết này?')) {
+        return;
+    }
+
+    allPosts[index].isDeleted = false;
+
+    filteredPosts = showDeleted ? [...allPosts] : allPosts.filter(p => !p.isDeleted);
+    renderPostsTable(filteredPosts);
+}
+
+// === COMMENTS CRUD FUNCTIONS ===
+
+// Xem comments của bài viết
+function viewComments(postId) {
+    currentPostId = postId;
+    const post = allPosts.find(p => p.id === postId);
+    const postComments = allComments.filter(c => c.postId === postId);
+
+    const commentsHTML = `
+        <div class="mb-3">
+            <h5>Comments cho: ${post ? post.title : 'Bài viết'}</h5>
+            <button class="btn btn-sm btn-success mb-3" onclick="openAddCommentModal()">+ Thêm comment</button>
+        </div>
+        <div class="list-group">
+            ${postComments.length === 0 ? '<p class="text-muted">Chưa có comment nào</p>' : ''}
+            ${postComments.map(comment => `
+                <div class="list-group-item ${comment.isDeleted ? 'bg-light' : ''}">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="flex-grow-1" style="${comment.isDeleted ? 'text-decoration: line-through; opacity: 0.6;' : ''}">
+                            <strong>Comment #${comment.id}</strong>
+                            <p class="mb-1">${comment.text}</p>
+                        </div>
+                        <div class="btn-group-vertical btn-group-sm">
+                            ${!comment.isDeleted ? `
+                                <button class="btn btn-sm btn-primary" onclick="editComment('${comment.id}')">Sửa</button>
+                                <button class="btn btn-sm btn-danger" onclick="softDeleteComment('${comment.id}')">Xóa</button>
+                            ` : `
+                                <button class="btn btn-sm btn-success" onclick="restoreComment('${comment.id}')">Khôi phục</button>
+                            `}
+                        </div>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+    `;
+
+    appElement.innerHTML = `
+        <div class="mb-3">
+            <button class="btn btn-secondary" onclick="fetchData()">← Quay lại danh sách bài viết</button>
+        </div>
+        ${commentsHTML}
+    `;
+}
+
+// Mở modal thêm comment
+function openAddCommentModal() {
+    editingCommentIndex = -1;
+    document.getElementById('commentModalTitle').textContent = 'Thêm comment';
+    document.getElementById('commentForm').reset();
+    document.getElementById('commentId').value = '';
+    commentModal.show();
+}
+
+// Sửa comment
+function editComment(commentId) {
+    const comment = allComments.find(c => c.id === commentId);
+    if (!comment) return;
+
+    editingCommentIndex = allComments.findIndex(c => c.id === commentId);
+    document.getElementById('commentModalTitle').textContent = 'Sửa comment';
+    document.getElementById('commentId').value = comment.id;
+    document.getElementById('commentText').value = comment.text || '';
+    commentModal.show();
+}
+
+// Lưu comment
+function saveComment() {
+    const text = document.getElementById('commentText').value.trim();
+
+    if (!text) {
+        alert('Vui lòng nhập nội dung comment!');
+        return;
+    }
+
+    const commentData = {
+        id: editingCommentIndex === -1 ? getNextCommentId() : allComments[editingCommentIndex].id,
+        text: text,
+        postId: currentPostId,
+        isDeleted: false
+    };
+
+    if (editingCommentIndex === -1) {
+        // Thêm mới
+        allComments.push(commentData);
+    } else {
+        // Sửa
+        allComments[editingCommentIndex] = commentData;
+    }
+
+    commentModal.hide();
+    viewComments(currentPostId);
+}
+
+// Xóa mềm comment
+function softDeleteComment(commentId) {
+    if (!confirm('Bạn có chắc chắn muốn xóa comment này?')) {
+        return;
+    }
+
+    const index = allComments.findIndex(c => c.id === commentId);
+    if (index !== -1) {
+        allComments[index].isDeleted = true;
+        viewComments(currentPostId);
+    }
+}
+
+// Khôi phục comment
+function restoreComment(commentId) {
+    if (!confirm('Bạn có muốn khôi phục comment này?')) {
+        return;
+    }
+
+    const index = allComments.findIndex(c => c.id === commentId);
+    if (index !== -1) {
+        allComments[index].isDeleted = false;
+        viewComments(currentPostId);
+    }
 }
 
 // Gọi hàm fetch khi trang load xong
