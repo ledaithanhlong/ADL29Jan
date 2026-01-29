@@ -1,5 +1,5 @@
-// URL của file db.json
-const dataUrl = './db.json';
+// URL của JSON Server API
+const dataUrl = 'http://localhost:3000';
 
 // Biến lưu trữ dữ liệu gốc
 let allData = { posts: [], comments: [], profile: {} };
@@ -28,21 +28,19 @@ document.addEventListener('DOMContentLoaded', function () {
     commentModal = new bootstrap.Modal(document.getElementById('commentModal'));
 });
 
-// Hàm fetch dữ liệu từ db.json
+// Hàm fetch dữ liệu từ JSON Server
 function fetchData() {
     appElement.innerHTML = '<div class="loading">Đang tải dữ liệu...</div>';
 
-    fetch(dataUrl)
-        .then(function (response) {
-            if (!response.ok) {
-                throw new Error('Không thể tải dữ liệu');
-            }
-            return response.json();
-        })
-        .then(function (data) {
-            allData = data;
-            allPosts = data.posts || [];
-            allComments = data.comments || [];
+    // Fetch posts và comments từ JSON Server
+    Promise.all([
+        fetch(`${dataUrl}/posts`).then(res => res.json()),
+        fetch(`${dataUrl}/comments`).then(res => res.json())
+    ])
+        .then(function ([posts, comments]) {
+            allData = { posts, comments, profile: {} };
+            allPosts = posts || [];
+            allComments = comments || [];
             filteredPosts = [...allPosts];
             renderPostsTable(filteredPosts);
         })
