@@ -69,7 +69,7 @@ function getNextCommentId() {
 function toggleShowDeleted() {
     showDeleted = !showDeleted;
     const btn = document.getElementById('toggleDeletedBtn');
-    btn.textContent = showDeleted ? '👁️ Ẩn đã xóa' : '👁️ Hiện đã xóa';
+    btn.textContent = showDeleted ? ' Ẩn đã xóa' : ' Hiện đã xóa';
     btn.className = showDeleted ? 'btn btn-sm btn-warning' : 'btn btn-sm btn-secondary';
 
     if (showDeleted) {
