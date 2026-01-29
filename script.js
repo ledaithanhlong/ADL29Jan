@@ -6,7 +6,7 @@ let allProducts = [];
 let filteredProducts = [];
 
 // Biến phân trang
-let currentPageSize = -1;
+let currentPageSize = 5; // Mặc định hiển thị 5 sản phẩm/trang
 let currentPage = 1;
 
 // Biến cho modal

@@ -294,14 +294,14 @@
         <!-- Pagination Section -->
         <div class="search-sort-section">
             <div class="row">
-                <div class="col-md-12">
-                    <label class="form-label">Số lượng hiển thị:</label>
-                    <div>
-                        <button class="btn btn-outline-secondary btn-sm" onclick="changePageSize(5)">5</button>
-                        <button class="btn btn-outline-secondary btn-sm" onclick="changePageSize(10)">10</button>
-                        <button class="btn btn-outline-secondary btn-sm" onclick="changePageSize(15)">15</button>
-                        <button class="btn btn-outline-secondary btn-sm" onclick="changePageSize(-1)">Tất cả</button>
-                    </div>
+                <div class="col-md-3">
+                    <label class="form-label">Số lượng hiển thị trên 1 trang:</label>
+                    <select class="form-select" id="pageSizeSelect" onchange="changePageSize(parseInt(this.value))">
+                        <option value="5" selected>5 sản phẩm</option>
+                        <option value="10">10 sản phẩm</option>
+                        <option value="15">15 sản phẩm</option>
+                        <option value="-1">Tất cả</option>
+                    </select>
                 </div>
             </div>
         </div>
