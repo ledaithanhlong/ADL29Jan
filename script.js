@@ -1,6 +1,9 @@
-// URL của file db.json trên GitHub (raw)
-// Thay đổi URL này thành raw URL của repo GitHub của bạn
+// URL của file db.json
 const dataUrl = './db.json';
+
+// Biến lưu trữ dữ liệu gốc
+let allProducts = [];
+let filteredProducts = [];
 
 // Lấy element app để render dữ liệu
 const appElement = document.getElementById('app');
@@ -21,8 +24,11 @@ function fetchData() {
             return response.json();
         })
         .then(function (data) {
+            // Lưu dữ liệu gốc
+            allProducts = data;
+            filteredProducts = data;
             // Render dữ liệu ra giao diện
-            renderProducts(data);
+            renderProductsTable(filteredProducts);
         })
         .catch(function (error) {
             // Xử lý lỗi
@@ -31,8 +37,8 @@ function fetchData() {
         });
 }
 
-// Hàm render danh sách sản phẩm
-function renderProducts(products) {
+// Hàm render bảng sản phẩm
+function renderProductsTable(products) {
     // Xóa nội dung cũ
     appElement.innerHTML = '';
 
@@ -42,60 +48,108 @@ function renderProducts(products) {
         return;
     }
 
-    // Loop qua từng sản phẩm và tạo HTML
-    products.forEach(function (product) {
-        // Tạo card cho mỗi sản phẩm
-        const productCard = createProductCard(product);
-        // Thêm vào app
-        appElement.appendChild(productCard);
-    });
+    // Tạo bảng Bootstrap
+    const tableHTML = `
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>ID</th>
+                        <th>Hình ảnh</th>
+                        <th>Tên sản phẩm</th>
+                        <th>Mô tả</th>
+                        <th>Giá</th>
+                        <th>Danh mục</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${products.map(function (product) {
+        return `
+                            <tr>
+                                <td>${product.id}</td>
+                                <td>
+                                    <img src="${product.images && product.images[0] ? product.images[0] : 'https://placehold.co/80x80'}" 
+                                         class="product-image" 
+                                         alt="${product.title || 'Product'}"
+                                         onerror="this.src='https://placehold.co/80x80?text=No+Image'">
+                                </td>
+                                <td><strong>${product.title || 'Không có tên'}</strong></td>
+                                <td>${product.description || 'Không có mô tả'}</td>
+                                <td><span class="badge bg-success">$${product.price || 0}</span></td>
+                                <td><span class="badge bg-primary">${product.category && product.category.name ? product.category.name : 'Uncategorized'}</span></td>
+                            </tr>
+                        `;
+    }).join('')}
+                </tbody>
+            </table>
+        </div>
+        <div class="text-center mt-3">
+            <p class="text-muted">Tổng số sản phẩm: <strong>${products.length}</strong></p>
+        </div>
+    `;
+
+    appElement.innerHTML = tableHTML;
 }
 
-// Hàm tạo card cho một sản phẩm
-function createProductCard(product) {
-    // Tạo div container
-    const card = document.createElement('div');
-    card.className = 'product-card';
+// Hàm tìm kiếm (sử dụng onChange và onInput)
+function handleSearch() {
+    const searchInput = document.getElementById('searchInput');
+    const searchTerm = searchInput.value.toLowerCase().trim();
 
-    // Tạo image
-    const image = document.createElement('img');
-    image.className = 'product-image';
-    image.src = product.images && product.images[0] ? product.images[0] : 'https://placehold.co/600x400';
-    image.alt = product.title || 'Product';
+    // Lọc sản phẩm theo tên
+    if (searchTerm === '') {
+        filteredProducts = allProducts;
+    } else {
+        filteredProducts = allProducts.filter(function (product) {
+            const productName = product.title ? product.title.toLowerCase() : '';
+            return productName.includes(searchTerm);
+        });
+    }
 
-    // Xử lý lỗi khi ảnh không load được
-    image.onerror = function () {
-        this.src = 'https://placehold.co/600x400?text=No+Image';
-    };
+    // Render lại bảng
+    renderProductsTable(filteredProducts);
+}
 
-    // Tạo title
-    const title = document.createElement('h2');
-    title.className = 'product-title';
-    title.textContent = product.title || 'Không có tên';
+// Hàm sắp xếp theo tên
+function sortByName(order) {
+    filteredProducts.sort(function (a, b) {
+        const nameA = (a.title || '').toLowerCase();
+        const nameB = (b.title || '').toLowerCase();
 
-    // Tạo description
-    const description = document.createElement('p');
-    description.className = 'product-description';
-    description.textContent = product.description || 'Không có mô tả';
+        if (order === 'asc') {
+            // A-Z
+            if (nameA < nameB) return -1;
+            if (nameA > nameB) return 1;
+            return 0;
+        } else {
+            // Z-A
+            if (nameA > nameB) return -1;
+            if (nameA < nameB) return 1;
+            return 0;
+        }
+    });
 
-    // Tạo price
-    const price = document.createElement('div');
-    price.className = 'product-price';
-    price.textContent = '$' + (product.price || 0);
+    // Render lại bảng
+    renderProductsTable(filteredProducts);
+}
 
-    // Tạo category
-    const category = document.createElement('span');
-    category.className = 'product-category';
-    category.textContent = product.category && product.category.name ? product.category.name : 'Uncategorized';
+// Hàm sắp xếp theo giá
+function sortByPrice(order) {
+    filteredProducts.sort(function (a, b) {
+        const priceA = a.price || 0;
+        const priceB = b.price || 0;
 
-    // Thêm các element vào card
-    card.appendChild(image);
-    card.appendChild(title);
-    card.appendChild(description);
-    card.appendChild(price);
-    card.appendChild(category);
+        if (order === 'asc') {
+            // Giá tăng dần
+            return priceA - priceB;
+        } else {
+            // Giá giảm dần
+            return priceB - priceA;
+        }
+    });
 
-    return card;
+    // Render lại bảng
+    renderProductsTable(filteredProducts);
 }
 
 // Gọi hàm fetch khi trang load xong
