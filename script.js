@@ -6,36 +6,38 @@ let allProducts = [];
 let filteredProducts = [];
 
 // Biến phân trang
-let currentPageSize = -1; // -1 nghĩa là hiển thị tất cả
+let currentPageSize = -1;
 let currentPage = 1;
+
+// Biến cho modal
+let editingProductIndex = -1;
+let productModal;
 
 // Lấy element app để render dữ liệu
 const appElement = document.getElementById('app');
 
+// Khởi tạo modal khi trang load
+document.addEventListener('DOMContentLoaded', function () {
+    productModal = new bootstrap.Modal(document.getElementById('productModal'));
+});
+
 // Hàm fetch dữ liệu từ db.json
 function fetchData() {
-    // Hiển thị loading
     appElement.innerHTML = '<div class="loading">Đang tải dữ liệu...</div>';
 
-    // Fetch dữ liệu từ file JSON
     fetch(dataUrl)
         .then(function (response) {
-            // Kiểm tra response có OK không
             if (!response.ok) {
                 throw new Error('Không thể tải dữ liệu');
             }
-            // Parse JSON
             return response.json();
         })
         .then(function (data) {
-            // Lưu dữ liệu gốc
             allProducts = data;
-            filteredProducts = data;
-            // Render dữ liệu ra giao diện
+            filteredProducts = [...data];
             renderProductsTable(filteredProducts);
         })
         .catch(function (error) {
-            // Xử lý lỗi
             appElement.innerHTML = '<div class="error">Lỗi: ' + error.message + '</div>';
             console.error('Error:', error);
         });
@@ -43,10 +45,8 @@ function fetchData() {
 
 // Hàm render bảng sản phẩm với phân trang
 function renderProductsTable(products) {
-    // Xóa nội dung cũ
     appElement.innerHTML = '';
 
-    // Kiểm tra có dữ liệu không
     if (!products || products.length === 0) {
         appElement.innerHTML = '<div class="error">Không có dữ liệu để hiển thị</div>';
         return;
@@ -66,32 +66,42 @@ function renderProductsTable(products) {
     // Tạo bảng Bootstrap
     const tableHTML = `
         <div class="table-responsive">
-            <table class="table table-striped table-hover">
-                <thead class="table-dark">
+            <table class="table table-hover">
+                <thead>
                     <tr>
-                        <th>ID</th>
-                        <th>Hình ảnh</th>
+                        <th style="width: 60px;">ID</th>
+                        <th style="width: 90px;">Hình ảnh</th>
                         <th>Tên sản phẩm</th>
                         <th>Mô tả</th>
-                        <th>Giá</th>
-                        <th>Danh mục</th>
+                        <th style="width: 100px;">Giá</th>
+                        <th style="width: 120px;">Danh mục</th>
+                        <th style="width: 150px;">Thao tác</th>
                     </tr>
                 </thead>
                 <tbody>
-                    ${displayProducts.map(function (product) {
+                    ${displayProducts.map(function (product, index) {
+        const actualIndex = currentPageSize > 0 ?
+            (currentPage - 1) * currentPageSize + index :
+            index;
         return `
                             <tr>
                                 <td>${product.id}</td>
                                 <td>
-                                    <img src="${product.images && product.images[0] ? product.images[0] : 'https://placehold.co/80x80'}" 
+                                    <img src="${product.images && product.images[0] ? product.images[0] : 'https://placehold.co/70x70'}" 
                                          class="product-image" 
                                          alt="${product.title || 'Product'}"
-                                         onerror="this.src='https://placehold.co/80x80?text=No+Image'">
+                                         onerror="this.src='https://placehold.co/70x70?text=No+Image'">
                                 </td>
                                 <td><strong>${product.title || 'Không có tên'}</strong></td>
                                 <td>${product.description || 'Không có mô tả'}</td>
                                 <td><span class="badge bg-success">$${product.price || 0}</span></td>
                                 <td><span class="badge bg-primary">${product.category && product.category.name ? product.category.name : 'Uncategorized'}</span></td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="btn btn-sm btn-primary" onclick="editProduct(${actualIndex})">Sửa</button>
+                                        <button class="btn btn-sm btn-danger" onclick="deleteProduct(${actualIndex})">Xóa</button>
+                                    </div>
+                                </td>
                             </tr>
                         `;
     }).join('')}
@@ -105,15 +115,15 @@ function renderProductsTable(products) {
             </p>
             ${currentPageSize > 0 && totalPages > 1 ? `
                 <div class="btn-group" role="group">
-                    <button class="btn btn-sm btn-outline-primary" onclick="changePage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="changePage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>
                         ← Trước
                     </button>
                     ${Array.from({ length: totalPages }, (_, i) => i + 1).map(page => `
-                        <button class="btn btn-sm ${page === currentPage ? 'btn-primary' : 'btn-outline-primary'}" onclick="changePage(${page})">
+                        <button class="btn btn-sm ${page === currentPage ? 'btn-primary' : 'btn-outline-secondary'}" onclick="changePage(${page})">
                             ${page}
                         </button>
                     `).join('')}
-                    <button class="btn btn-sm btn-outline-primary" onclick="changePage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="changePage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>
                         Sau →
                     </button>
                 </div>
@@ -124,14 +134,13 @@ function renderProductsTable(products) {
     appElement.innerHTML = tableHTML;
 }
 
-// Hàm tìm kiếm (sử dụng onChange và onInput)
+// Hàm tìm kiếm
 function handleSearch() {
     const searchInput = document.getElementById('searchInput');
     const searchTerm = searchInput.value.toLowerCase().trim();
 
-    // Lọc sản phẩm theo tên
     if (searchTerm === '') {
-        filteredProducts = allProducts;
+        filteredProducts = [...allProducts];
     } else {
         filteredProducts = allProducts.filter(function (product) {
             const productName = product.title ? product.title.toLowerCase() : '';
@@ -139,7 +148,7 @@ function handleSearch() {
         });
     }
 
-    // Render lại bảng
+    currentPage = 1;
     renderProductsTable(filteredProducts);
 }
 
@@ -150,19 +159,16 @@ function sortByName(order) {
         const nameB = (b.title || '').toLowerCase();
 
         if (order === 'asc') {
-            // A-Z
             if (nameA < nameB) return -1;
             if (nameA > nameB) return 1;
             return 0;
         } else {
-            // Z-A
             if (nameA > nameB) return -1;
             if (nameA < nameB) return 1;
             return 0;
         }
     });
 
-    // Render lại bảng
     renderProductsTable(filteredProducts);
 }
 
@@ -173,40 +179,31 @@ function sortByPrice(order) {
         const priceB = b.price || 0;
 
         if (order === 'asc') {
-            // Giá tăng dần
             return priceA - priceB;
         } else {
-            // Giá giảm dần
             return priceB - priceA;
         }
     });
 
-    // Render lại bảng
     renderProductsTable(filteredProducts);
 }
 
 // Hàm reset về trạng thái ban đầu
 function resetData() {
-    // Xóa nội dung ô tìm kiếm
     const searchInput = document.getElementById('searchInput');
     if (searchInput) {
         searchInput.value = '';
     }
 
-    // Reset về dữ liệu gốc
     filteredProducts = [...allProducts];
-
-    // Reset trang về 1
     currentPage = 1;
-
-    // Render lại bảng
     renderProductsTable(filteredProducts);
 }
 
 // Hàm thay đổi số lượng hiển thị trên 1 trang
 function changePageSize(size) {
     currentPageSize = size;
-    currentPage = 1; // Reset về trang 1
+    currentPage = 1;
     renderProductsTable(filteredProducts);
 }
 
@@ -218,6 +215,97 @@ function changePage(page) {
         currentPage = page;
         renderProductsTable(filteredProducts);
     }
+}
+
+// === CRUD FUNCTIONS ===
+
+// Mở modal thêm sản phẩm
+function openAddModal() {
+    editingProductIndex = -1;
+    document.getElementById('modalTitle').textContent = 'Thêm sản phẩm';
+    document.getElementById('productForm').reset();
+    document.getElementById('productId').value = '';
+    productModal.show();
+}
+
+// Mở modal sửa sản phẩm
+function editProduct(index) {
+    editingProductIndex = index;
+    const product = filteredProducts[index];
+
+    document.getElementById('modalTitle').textContent = 'Sửa sản phẩm';
+    document.getElementById('productId').value = product.id;
+    document.getElementById('productTitle').value = product.title || '';
+    document.getElementById('productDescription').value = product.description || '';
+    document.getElementById('productPrice').value = product.price || '';
+    document.getElementById('productImage').value = product.images && product.images[0] ? product.images[0] : '';
+    document.getElementById('productCategory').value = product.category && product.category.name ? product.category.name : '';
+
+    productModal.show();
+}
+
+// Lưu sản phẩm (thêm hoặc sửa)
+function saveProduct() {
+    const title = document.getElementById('productTitle').value.trim();
+    const description = document.getElementById('productDescription').value.trim();
+    const price = parseFloat(document.getElementById('productPrice').value);
+    const imageUrl = document.getElementById('productImage').value.trim();
+    const categoryName = document.getElementById('productCategory').value.trim();
+
+    if (!title || !price) {
+        alert('Vui lòng nhập tên sản phẩm và giá!');
+        return;
+    }
+
+    const productData = {
+        id: editingProductIndex === -1 ? Date.now() : filteredProducts[editingProductIndex].id,
+        title: title,
+        description: description,
+        price: price,
+        images: [imageUrl || 'https://placehold.co/600x400'],
+        category: {
+            id: 1,
+            name: categoryName || 'Uncategorized'
+        }
+    };
+
+    if (editingProductIndex === -1) {
+        // Thêm mới
+        allProducts.push(productData);
+        filteredProducts.push(productData);
+    } else {
+        // Sửa
+        const productId = filteredProducts[editingProductIndex].id;
+        const allProductIndex = allProducts.findIndex(p => p.id === productId);
+
+        if (allProductIndex !== -1) {
+            allProducts[allProductIndex] = productData;
+        }
+        filteredProducts[editingProductIndex] = productData;
+    }
+
+    productModal.hide();
+    renderProductsTable(filteredProducts);
+}
+
+// Xóa sản phẩm
+function deleteProduct(index) {
+    if (!confirm('Bạn có chắc chắn muốn xóa sản phẩm này?')) {
+        return;
+    }
+
+    const productId = filteredProducts[index].id;
+
+    // Xóa khỏi allProducts
+    const allProductIndex = allProducts.findIndex(p => p.id === productId);
+    if (allProductIndex !== -1) {
+        allProducts.splice(allProductIndex, 1);
+    }
+
+    // Xóa khỏi filteredProducts
+    filteredProducts.splice(index, 1);
+
+    renderProductsTable(filteredProducts);
 }
 
 // Gọi hàm fetch khi trang load xong
