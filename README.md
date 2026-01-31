@@ -36,18 +36,10 @@ cd <repository-folder>
 
 ### Bước 2: Chạy project
 
-**Cách 1: Sử dụng Live Server (Khuyến nghị)**
+**Mở trực tiếp bằng browser**
 
-1. Cài đặt extension "Live Server" trong VS Code
-2. Click chuột phải vào file `index.html`
-3. Chọn "Open with Live Server"
+http://localhost:8000/index.html
 
-**Cách 2: Mở trực tiếp bằng browser**
-
-1. Double-click vào file `index.html`
-2. Hoặc kéo thả file vào browser
-
-**Lưu ý:** Nếu sử dụng cách 2, một số browser có thể chặn fetch local file do CORS policy. Khuyến nghị sử dụng Live Server.
 
 ## Cách fetch dữ liệu từ db.json
 

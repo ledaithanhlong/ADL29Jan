@@ -1,8 +1,9 @@
 // URL của JSON Server API
-const dataUrl = 'http://localhost:3000';
+const API_URL = 'http://localhost:3000';
+const POSTS_URL = `${API_URL}/posts`;
+const COMMENTS_URL = `${API_URL}/comments`;
 
 // Biến lưu trữ dữ liệu gốc
-let allData = { posts: [], comments: [], profile: {} };
 let allPosts = [];
 let filteredPosts = [];
 let allComments = [];
@@ -13,9 +14,9 @@ let currentPageSize = 5;
 let currentPage = 1;
 
 // Biến cho modal
-let editingPostIndex = -1;
-let editingCommentIndex = -1;
-let postModal;
+let editingPostId = null;
+let editingCommentId = null;
+let productModal;
 let commentModal;
 let currentPostId = null; // ID bài viết hiện tại để xem comments
 
@@ -24,7 +25,7 @@ const appElement = document.getElementById('app');
 
 // Khởi tạo modal khi trang load
 document.addEventListener('DOMContentLoaded', function () {
-    postModal = new bootstrap.Modal(document.getElementById('postModal'));
+    productModal = new bootstrap.Modal(document.getElementById('productModal'));
     commentModal = new bootstrap.Modal(document.getElementById('commentModal'));
 });
 
@@ -32,26 +33,24 @@ document.addEventListener('DOMContentLoaded', function () {
 function fetchData() {
     appElement.innerHTML = '<div class="loading">Đang tải dữ liệu...</div>';
 
-    // Fetch posts và comments từ JSON Server
     Promise.all([
-        fetch(`${dataUrl}/posts`).then(res => res.json()),
-        fetch(`${dataUrl}/comments`).then(res => res.json())
+        fetch(POSTS_URL).then(res => res.json()),
+        fetch(COMMENTS_URL).then(res => res.json())
     ])
         .then(function ([posts, comments]) {
-            allData = { posts, comments, profile: {} };
             allPosts = posts || [];
             allComments = comments || [];
             filteredPosts = [...allPosts];
-            renderPostsTable(filteredPosts);
+            renderProductsTable(filteredPosts);
         })
         .catch(function (error) {
-            appElement.innerHTML = '<div class="error">Lỗi: ' + error.message + '</div>';
+            appElement.innerHTML = '<div class="error">Lỗi: ' + error.message + '<br>Đảm bảo json-server đang chạy: npx json-server db.json --static .</div>';
             console.error('Error:', error);
         });
 }
 
 // Hàm lấy max ID và tạo ID mới
-function getNextPostId() {
+function getNextProductId() {
     if (allPosts.length === 0) return "1";
 
     const maxId = Math.max(...allPosts.map(p => parseInt(p.id) || 0));
@@ -69,8 +68,8 @@ function getNextCommentId() {
 function toggleShowDeleted() {
     showDeleted = !showDeleted;
     const btn = document.getElementById('toggleDeletedBtn');
-    btn.textContent = showDeleted ? ' Ẩn đã xóa' : ' Hiện đã xóa';
-    btn.className = showDeleted ? 'btn btn-sm btn-warning' : 'btn btn-sm btn-secondary';
+    btn.textContent = showDeleted ? '👁️ Ẩn đã xóa' : '👁️ Hiện đã xóa';
+    btn.className = showDeleted ? 'btn btn-sm btn-warning me-2' : 'btn btn-sm btn-secondary me-2';
 
     if (showDeleted) {
         filteredPosts = [...allPosts];
@@ -79,11 +78,11 @@ function toggleShowDeleted() {
     }
 
     currentPage = 1;
-    renderPostsTable(filteredPosts);
+    renderProductsTable(filteredPosts);
 }
 
 // Hàm render bảng bài viết với phân trang
-function renderPostsTable(posts) {
+function renderProductsTable(posts) {
     appElement.innerHTML = '';
 
     if (!posts || posts.length === 0) {
@@ -108,30 +107,29 @@ function renderPostsTable(posts) {
             <table class="table table-hover">
                 <thead>
                     <tr>
-                        <th style="width: 60px;">ID</th>
-                        <th>Title</th>
-                        <th style="width: 100px;">Views</th>
-                        <th style="width: 200px;">Thao tác</th>
+                        <th style="width: 80px;">ID</th>
+                        <th>Tiêu đề</th>
+                        <th style="width: 150px;">Lượt xem</th>
+                        <th style="width: 250px;">Thao tác</th>
                     </tr>
                 </thead>
                 <tbody>
-                    ${displayPosts.map(function (post, index) {
-        const actualIndex = allPosts.findIndex(p => p.id === post.id);
+                    ${displayPosts.map(function (post) {
         const isDeleted = post.isDeleted || false;
         const rowStyle = isDeleted ? 'style="text-decoration: line-through; opacity: 0.6; background-color: #ffe6e6;"' : '';
 
         return `
                             <tr ${rowStyle}>
                                 <td>${post.id}</td>
-                                <td><strong>${post.title || 'Không có tên'}</strong></td>
-                                <td><span class="badge bg-success">${post.views || 0}</span></td>
+                                <td><strong>${post.title || 'Không có tiêu đề'}</strong></td>
+                                <td><span class="badge bg-info">${post.views || 0} views</span></td>
                                 <td>
                                     <div class="action-buttons">
                                         ${!isDeleted ? `
-                                            <button class="btn btn-sm btn-primary" onclick="editPost(${actualIndex})">Sửa</button>
-                                            <button class="btn btn-sm btn-danger" onclick="softDeletePost(${actualIndex})">Xóa</button>
+                                            <button class="btn btn-sm btn-primary" onclick="editProduct('${post.id}')">Sửa</button>
+                                            <button class="btn btn-sm btn-danger" onclick="softDeleteProduct('${post.id}')">Xóa</button>
                                         ` : `
-                                            <button class="btn btn-sm btn-success" onclick="restorePost(${actualIndex})">Khôi phục</button>
+                                            <button class="btn btn-sm btn-success" onclick="restoreProduct('${post.id}')">Khôi phục</button>
                                         `}
                                         <button class="btn btn-sm btn-info" onclick="viewComments('${post.id}')">Comments</button>
                                     </div>
@@ -190,7 +188,7 @@ function handleSearch() {
     }
 
     currentPage = 1;
-    renderPostsTable(filteredPosts);
+    renderProductsTable(filteredPosts);
 }
 
 // Hàm sắp xếp theo tên
@@ -210,10 +208,10 @@ function sortByName(order) {
         }
     });
 
-    renderPostsTable(filteredPosts);
+    renderProductsTable(filteredPosts);
 }
 
-// Hàm sắp xếp theo views
+// Hàm sắp xếp theo lượt xem
 function sortByPrice(order) {
     filteredPosts.sort(function (a, b) {
         const viewsA = parseInt(a.views) || 0;
@@ -226,7 +224,7 @@ function sortByPrice(order) {
         }
     });
 
-    renderPostsTable(filteredPosts);
+    renderProductsTable(filteredPosts);
 }
 
 // Hàm reset về trạng thái ban đầu
@@ -238,14 +236,14 @@ function resetData() {
 
     filteredPosts = showDeleted ? [...allPosts] : allPosts.filter(p => !p.isDeleted);
     currentPage = 1;
-    renderPostsTable(filteredPosts);
+    renderProductsTable(filteredPosts);
 }
 
 // Hàm thay đổi số lượng hiển thị trên 1 trang
 function changePageSize(size) {
     currentPageSize = size;
     currentPage = 1;
-    renderPostsTable(filteredPosts);
+    renderProductsTable(filteredPosts);
 }
 
 // Hàm chuyển trang
@@ -254,7 +252,7 @@ function changePage(page) {
 
     if (page >= 1 && page <= totalPages) {
         currentPage = page;
-        renderPostsTable(filteredPosts);
+        renderProductsTable(filteredPosts);
     }
 }
 
@@ -262,86 +260,151 @@ function changePage(page) {
 
 // Mở modal thêm bài viết
 function openAddModal() {
-    editingPostIndex = -1;
+    editingPostId = null;
     document.getElementById('modalTitle').textContent = 'Thêm bài viết';
-    document.getElementById('postForm').reset();
-    document.getElementById('postId').value = ''; // Để trống, sẽ tự động tạo
-    postModal.show();
+    document.getElementById('productForm').reset();
+    productModal.show();
 }
 
 // Mở modal sửa bài viết
-function editPost(index) {
-    editingPostIndex = index;
-    const post = allPosts[index];
+function editProduct(postId) {
+    const post = allPosts.find(p => p.id === postId);
+    if (!post) return;
 
+    editingPostId = postId;
     document.getElementById('modalTitle').textContent = 'Sửa bài viết';
-    document.getElementById('postId').value = post.id;
-    document.getElementById('postTitle').value = post.title || '';
-    document.getElementById('postViews').value = post.views || '';
+    document.getElementById('productTitle').value = post.title || '';
+    document.getElementById('productDescription').value = post.views || '';
+    document.getElementById('productPrice').style.display = 'none';
+    document.getElementById('productImage').style.display = 'none';
+    document.getElementById('productCategory').style.display = 'none';
 
-    postModal.show();
+    // Đổi label
+    document.querySelector('label[for="productDescription"]').textContent = 'Lượt xem *';
+
+    productModal.show();
 }
 
 // Lưu bài viết (thêm hoặc sửa)
-function savePost() {
-    const title = document.getElementById('postTitle').value.trim();
-    const views = document.getElementById('postViews').value.trim();
+function saveProduct() {
+    const title = document.getElementById('productTitle').value.trim();
+    const views = document.getElementById('productDescription').value.trim();
 
-    if (!title) {
-        alert('Vui lòng nhập tiêu đề bài viết!');
+    if (!title || !views) {
+        alert('Vui lòng nhập tiêu đề và lượt xem!');
         return;
     }
 
     const postData = {
-        id: editingPostIndex === -1 ? getNextPostId() : allPosts[editingPostIndex].id,
         title: title,
-        views: views || '0',
+        views: views,
         isDeleted: false
     };
 
-    if (editingPostIndex === -1) {
-        // Thêm mới
-        allPosts.push(postData);
+    if (editingPostId === null) {
+        // Thêm mới - POST request
+        postData.id = getNextProductId();
+
+        fetch(POSTS_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(postData)
+        })
+            .then(res => res.json())
+            .then(newPost => {
+                allPosts.push(newPost);
+                filteredPosts = showDeleted ? [...allPosts] : allPosts.filter(p => !p.isDeleted);
+                productModal.hide();
+                renderProductsTable(filteredPosts);
+            })
+            .catch(error => {
+                alert('Lỗi khi thêm bài viết: ' + error.message);
+            });
     } else {
-        // Sửa
-        allPosts[editingPostIndex] = postData;
+        // Sửa - PUT request
+        postData.id = editingPostId;
+
+        fetch(`${POSTS_URL}/${editingPostId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(postData)
+        })
+            .then(res => res.json())
+            .then(updatedPost => {
+                const index = allPosts.findIndex(p => p.id === editingPostId);
+                if (index !== -1) {
+                    allPosts[index] = updatedPost;
+                }
+                filteredPosts = showDeleted ? [...allPosts] : allPosts.filter(p => !p.isDeleted);
+                productModal.hide();
+                renderProductsTable(filteredPosts);
+            })
+            .catch(error => {
+                alert('Lỗi khi sửa bài viết: ' + error.message);
+            });
     }
-
-    // Cập nhật filteredPosts
-    filteredPosts = showDeleted ? [...allPosts] : allPosts.filter(p => !p.isDeleted);
-
-    postModal.hide();
-    renderPostsTable(filteredPosts);
 }
 
 // Xóa mềm bài viết
-function softDeletePost(index) {
+function softDeleteProduct(postId) {
     if (!confirm('Bạn có chắc chắn muốn xóa bài viết này?')) {
         return;
     }
 
-    allPosts[index].isDeleted = true;
+    const post = allPosts.find(p => p.id === postId);
+    if (!post) return;
 
-    // Cập nhật filteredPosts
-    if (!showDeleted) {
-        filteredPosts = allPosts.filter(p => !p.isDeleted);
-    } else {
-        filteredPosts = [...allPosts];
-    }
+    post.isDeleted = true;
 
-    renderPostsTable(filteredPosts);
+    // PATCH request để cập nhật isDeleted
+    fetch(`${POSTS_URL}/${postId}`, {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ isDeleted: true })
+    })
+        .then(res => res.json())
+        .then(() => {
+            filteredPosts = showDeleted ? [...allPosts] : allPosts.filter(p => !p.isDeleted);
+            renderProductsTable(filteredPosts);
+        })
+        .catch(error => {
+            alert('Lỗi khi xóa bài viết: ' + error.message);
+        });
 }
 
 // Khôi phục bài viết
-function restorePost(index) {
+function restoreProduct(postId) {
     if (!confirm('Bạn có muốn khôi phục bài viết này?')) {
         return;
     }
 
-    allPosts[index].isDeleted = false;
+    const post = allPosts.find(p => p.id === postId);
+    if (!post) return;
 
-    filteredPosts = showDeleted ? [...allPosts] : allPosts.filter(p => !p.isDeleted);
-    renderPostsTable(filteredPosts);
+    post.isDeleted = false;
+
+    // PATCH request để cập nhật isDeleted
+    fetch(`${POSTS_URL}/${postId}`, {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ isDeleted: false })
+    })
+        .then(res => res.json())
+        .then(() => {
+            filteredPosts = showDeleted ? [...allPosts] : allPosts.filter(p => !p.isDeleted);
+            renderProductsTable(filteredPosts);
+        })
+        .catch(error => {
+            alert('Lỗi khi khôi phục bài viết: ' + error.message);
+        });
 }
 
 // === COMMENTS CRUD FUNCTIONS ===
@@ -390,10 +453,9 @@ function viewComments(postId) {
 
 // Mở modal thêm comment
 function openAddCommentModal() {
-    editingCommentIndex = -1;
+    editingCommentId = null;
     document.getElementById('commentModalTitle').textContent = 'Thêm comment';
     document.getElementById('commentForm').reset();
-    document.getElementById('commentId').value = '';
     commentModal.show();
 }
 
@@ -402,9 +464,8 @@ function editComment(commentId) {
     const comment = allComments.find(c => c.id === commentId);
     if (!comment) return;
 
-    editingCommentIndex = allComments.findIndex(c => c.id === commentId);
+    editingCommentId = commentId;
     document.getElementById('commentModalTitle').textContent = 'Sửa comment';
-    document.getElementById('commentId').value = comment.id;
     document.getElementById('commentText').value = comment.text || '';
     commentModal.show();
 }
@@ -419,22 +480,55 @@ function saveComment() {
     }
 
     const commentData = {
-        id: editingCommentIndex === -1 ? getNextCommentId() : allComments[editingCommentIndex].id,
         text: text,
         postId: currentPostId,
         isDeleted: false
     };
 
-    if (editingCommentIndex === -1) {
-        // Thêm mới
-        allComments.push(commentData);
-    } else {
-        // Sửa
-        allComments[editingCommentIndex] = commentData;
-    }
+    if (editingCommentId === null) {
+        // Thêm mới - POST request
+        commentData.id = getNextCommentId();
 
-    commentModal.hide();
-    viewComments(currentPostId);
+        fetch(COMMENTS_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(commentData)
+        })
+            .then(res => res.json())
+            .then(newComment => {
+                allComments.push(newComment);
+                commentModal.hide();
+                viewComments(currentPostId);
+            })
+            .catch(error => {
+                alert('Lỗi khi thêm comment: ' + error.message);
+            });
+    } else {
+        // Sửa - PUT request
+        commentData.id = editingCommentId;
+
+        fetch(`${COMMENTS_URL}/${editingCommentId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(commentData)
+        })
+            .then(res => res.json())
+            .then(updatedComment => {
+                const index = allComments.findIndex(c => c.id === editingCommentId);
+                if (index !== -1) {
+                    allComments[index] = updatedComment;
+                }
+                commentModal.hide();
+                viewComments(currentPostId);
+            })
+            .catch(error => {
+                alert('Lỗi khi sửa comment: ' + error.message);
+            });
+    }
 }
 
 // Xóa mềm comment
@@ -443,11 +537,26 @@ function softDeleteComment(commentId) {
         return;
     }
 
-    const index = allComments.findIndex(c => c.id === commentId);
-    if (index !== -1) {
-        allComments[index].isDeleted = true;
-        viewComments(currentPostId);
-    }
+    const comment = allComments.find(c => c.id === commentId);
+    if (!comment) return;
+
+    comment.isDeleted = true;
+
+    // PATCH request
+    fetch(`${COMMENTS_URL}/${commentId}`, {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ isDeleted: true })
+    })
+        .then(res => res.json())
+        .then(() => {
+            viewComments(currentPostId);
+        })
+        .catch(error => {
+            alert('Lỗi khi xóa comment: ' + error.message);
+        });
 }
 
 // Khôi phục comment
@@ -456,11 +565,26 @@ function restoreComment(commentId) {
         return;
     }
 
-    const index = allComments.findIndex(c => c.id === commentId);
-    if (index !== -1) {
-        allComments[index].isDeleted = false;
-        viewComments(currentPostId);
-    }
+    const comment = allComments.find(c => c.id === commentId);
+    if (!comment) return;
+
+    comment.isDeleted = false;
+
+    // PATCH request
+    fetch(`${COMMENTS_URL}/${commentId}`, {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ isDeleted: false })
+    })
+        .then(res => res.json())
+        .then(() => {
+            viewComments(currentPostId);
+        })
+        .catch(error => {
+            alert('Lỗi khi khôi phục comment: ' + error.message);
+        });
 }
 
 // Gọi hàm fetch khi trang load xong
